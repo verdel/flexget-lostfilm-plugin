@@ -6,6 +6,7 @@ from future.moves.urllib.parse import urlparse, urlsplit
 
 import os
 import logging
+import re
 import xml.sax
 import posixpath
 import http.client
