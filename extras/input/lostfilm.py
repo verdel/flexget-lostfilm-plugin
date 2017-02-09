@@ -193,7 +193,7 @@ class LostfilmRSS(object):
     @cached('lostfilm')
     @plugin.internet(log)
     def on_task_input(self, task, config):
-        config = self._build_config(config)
+        config = self._build_config(task, config)
 
         log.debug('Requesting task `%s` url `%s`', task.name, config['rss-url'])
 
