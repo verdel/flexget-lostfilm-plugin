@@ -216,7 +216,7 @@ class LostfilmRSS(object):
                     log.debug('Sending last-modified %s for task %s', headers['If-Modified-Since'], task.name)
 
         # Get the feed content
-        if config['url'].startswith(('http', 'https')):
+        if config['rss-url'].startswith(('http', 'https')):
             # Get feed using requests library
             try:
                 # Use the raw response so feedparser can read the headers and status values
