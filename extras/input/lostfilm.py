@@ -89,7 +89,7 @@ class LostfilmRSS(object):
         config.setdefault('all_entries', True)
         return config
 
-    def get_url_from_entry(self, task, entry):
+    def get_url_from_entry(self, task, url, entry):
         enclosure = []
         try:
             # Use the raw response so feedparser can read the headers and status values
@@ -105,12 +105,12 @@ class LostfilmRSS(object):
         season_id = int(match.group(2))
         episode_id = int(match.group(3))
         try:
-            response = task.requests.get('{}?c={}&s={}&e={}'.format(config['series-search-url'], show_id, season_id, episode_id),
+            response = task.requests.get('{}?c={}&s={}&e={}'.format(url, show_id, season_id, episode_id),
                                          timeout=60, raise_status=False)
             data = response.content
         except RequestException as e:
             raise plugin.PluginError('Unable to download the data for task %s (%s): %s' %
-                                     (task.name, '{}?c={}&s={}&e={}'.format(config['series-search-url'], show_id, season_id, episode_id), e))
+                                     (task.name, '{}?c={}&s={}&e={}'.format(url, show_id, season_id, episode_id), e))
 
         soup = get_soup(data, 'html.parser')
         retre_url = soup.a['href']
@@ -384,7 +384,7 @@ class LostfilmRSS(object):
                 ignored += 1
                 continue
 
-            for item in self.get_url_from_entry(task, e):
+            for item in self.get_url_from_entry(task, config['series-search-url'], e):
                 add_entry(item)
 
         # Save last spot in rss
