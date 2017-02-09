@@ -378,8 +378,7 @@ class LostfilmRSS(object):
             # create flexget entry
             e = Entry()
 
-            if len(entry.get('enclosures', [])) == 1 and entry['enclosures'][0].get('href'):
-                self.add_enclosure_info(e, entry['enclosures'][0], config.get('filename', True))
+            e['url'] = entry[field]
 
             if not e.get('url'):
                 log.debug('%s does not have link (%s) or enclosure', entry.title)
