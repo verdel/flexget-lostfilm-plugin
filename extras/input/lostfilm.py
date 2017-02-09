@@ -11,8 +11,8 @@ from future.moves.urllib.parse import urlparse, urlsplit
 import os
 import logging
 import re
+import requests
 import xml.sax
-import posixpath
 import http.client
 from datetime import datetime
 
@@ -99,10 +99,10 @@ class LostfilmRSS(object):
     def _get_session_token(self, task, config):
         try:
             payload = {'act': 'users', 'type': 'login', 'mail': config['email'], 'pass': config['password'], 'rem': '0'}
-            response = task.requests.get(config['auth-url'], timeout=60, data=payload, raise_status=False)
+            response = task.requests.post(config['auth-url'], timeout=60, data=payload, raise_status=False)
             content = response.json()
         except RequestException as e:
-            raise plugin.PluginError('Unable to get session token for task %s (%s): %s' %
+            raise plugin.PluginError('Unable to get session token for task %s (%s) credentials(): %s' %
                                      (task.name, config['auth-url'], e))
 
         if 'success' in content and 'error' not in content:
@@ -122,18 +122,24 @@ class LostfilmRSS(object):
             raise plugin.PluginError('Unable to download the data for task %s (%s): %s' %
                                      (task.name, entry['url'], e))
         soup = get_soup(data, 'html.parser')
-        episode_attr = soup.find("div", {"class": "external-btn"}).attrs['onclick']
+        episode_attr = soup.find("div", {"class": "external-btn"})
+        if episode_attr:
+            episode_attr = episode_attr.attrs['onclick']
+        else:
+            log.warning('Unable to download data for task %s (%s)' %
+                        (task.name, entry['url']))
+            return entries
         match = re.search("PlayEpisode\('([\d]*)','([\d]*)','([\d]*)'\)", episode_attr)
         show_id = int(match.group(1))
         season_id = int(match.group(2))
         episode_id = int(match.group(3))
         try:
-            response = task.requests.get('{}?c={}&s={}&e={}'.format(url, show_id, season_id, episode_id),
-                                         timeout=60, cookies={'lf_session': config['session_token']}, raise_status=False)
+            response = requests.get('{}?c={}&s={}&e={}'.format(config['series-search-url'], show_id, season_id, episode_id),
+                                    timeout=60, cookies={'lf_session': config['session_token']})
             data = response.content
         except RequestException as e:
             raise plugin.PluginError('Unable to download the data for task %s (%s): %s' %
-                                     (task.name, '{}?c={}&s={}&e={}'.format(url, show_id, season_id, episode_id), e))
+                                     (task.name, '{}?c={}&s={}&e={}'.format(show_id, season_id, episode_id), e))
 
         soup = get_soup(data, 'html.parser')
         retre_url = soup.a['href']
@@ -347,49 +353,49 @@ class LostfilmRSS(object):
             # remove annoying zero width spaces
             entry.title = entry.title.replace(u'\u200B', u'')
 
-            # helper
-            # TODO: confusing? refactor into class member ...
+            # # helper
+            # # TODO: confusing? refactor into class member ...
 
-            def add_entry(ea):
-                ea['title'] = entry.title
+            # def add_entry(ea):
+            #     ea['title'] = entry['title']
 
-                # fields dict may be modified during this loop, so loop over a copy (fields.items())
-                for rss_field, flexget_field in list(fields.items()):
-                    if rss_field in entry:
-                        if not isinstance(getattr(entry, rss_field), basestring):
-                            # Error if this field is not a string
-                            log.error('Cannot grab non text field `%s` from rss.', rss_field)
-                            # Remove field from list of fields to avoid repeated error
-                            del fields[rss_field]
-                            continue
-                        if not getattr(entry, rss_field):
-                            log.debug('Not grabbing blank field %s from rss for %s.', rss_field, ea['title'])
-                            continue
-                        try:
-                            ea[flexget_field] = decode_html(entry[rss_field])
-                        except UnicodeDecodeError:
-                            log.warning('Failed to decode entry `%s` field `%s`', ea['title'], rss_field)
-                # Also grab pubdate if available
-                if hasattr(entry, 'published_parsed') and entry.published_parsed:
-                    ea['rss_pubdate'] = datetime(*entry.published_parsed[:6])
-                # store basic auth info
-                entries.append(ea)
+            #     # fields dict may be modified during this loop, so loop over a copy (fields.items())
+            #     for rss_field, flexget_field in list(fields.items()):
+            #         if rss_field in entry:
+            #             if not isinstance(getattr(entry, rss_field), basestring):
+            #                 # Error if this field is not a string
+            #                 log.error('Cannot grab non text field `%s` from rss.', rss_field)
+            #                 # Remove field from list of fields to avoid repeated error
+            #                 del fields[rss_field]
+            #                 continue
+            #             if not getattr(entry, rss_field):
+            #                 log.debug('Not grabbing blank field %s from rss for %s.', rss_field, ea['title'])
+            #                 continue
+            #             try:
+            #                 ea[flexget_field] = decode_html(entry[rss_field])
+            #             except UnicodeDecodeError:
+            #                 log.warning('Failed to decode entry `%s` field `%s`', ea['title'], rss_field)
+            #     # Also grab pubdate if available
+            #     if hasattr(entry, 'published_parsed') and entry.published_parsed:
+            #         ea['rss_pubdate'] = datetime(*entry.published_parsed[:6])
+            #     # store basic auth info
+            #     entries.append(ea)
 
             # create from enclosures if present
             # enclosures = entry.get('enclosures', [])
 
             # create flexget entry
             e = Entry()
-
+            e['title'] = entry['title']
             e['url'] = entry['link']
 
             if not e.get('url'):
-                log.debug('%s does not have link (%s) or enclosure', entry.title)
+                log.debug('%s does not have link (%s) or enclosure', entry['title'])
                 ignored += 1
                 continue
 
-            for item in self.get_url_from_entry(task, config['series-search-url'], e):
-                add_entry(item)
+            for item in self._get_url_from_site(task, config, e):
+                entries.append(item)
 
         # Save last spot in rss
         if rss.entries:
