@@ -74,7 +74,6 @@ class LostfilmRSS(object):
             'series-search-url': {'type': 'string', 'format': 'url', 'default': 'https://lostfilm.tv/v_search.php'},
             'silent': {'type': 'boolean', 'default': False},
             'filename': {'type': 'boolean'},
-            'link': one_or_more({'type': 'string'}),
             'ascii': {'type': 'boolean', 'default': False},
             'all_entries': {'type': 'boolean', 'default': True},
         },
@@ -85,11 +84,6 @@ class LostfilmRSS(object):
     def build_config(self, config):
         """Set default values to config"""
         config.setdefault('title', 'title')
-        # Convert any field names from the config to format feedparser will use for 'link', 'title' and 'other_fields'
-        if config['link'] != 'auto':
-            if not isinstance(config['link'], list):
-                config['link'] = [config['link']]
-            config['link'] = list(map(fp_field_name, config['link']))
         # set default for all_entries
         config.setdefault('all_entries', True)
         return config
