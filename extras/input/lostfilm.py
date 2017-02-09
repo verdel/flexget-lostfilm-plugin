@@ -105,9 +105,8 @@ class LostfilmRSS(object):
         season_id = int(match.group(2))
         episode_id = int(match.group(3))
         try:
-            # Use the raw response so feedparser can read the headers and status values
-            response = requests.get('{}?c={}&s={}&e={}'.format(config['series-search-url'], show_id, season_id, episode_id),
-                                    timeout=60, raise_status=False)
+            response = task.requests.get('{}?c={}&s={}&e={}'.format(config['series-search-url'], show_id, season_id, episode_id),
+                                         timeout=60, raise_status=False)
             data = response.content
         except RequestException as e:
             raise plugin.PluginError('Unable to download the data for task %s (%s): %s' %
@@ -117,8 +116,7 @@ class LostfilmRSS(object):
         retre_url = soup.a['href']
 
         try:
-            # Use the raw response so feedparser can read the headers and status values
-            response = requests.get(retre_url, timeout=60, raise_status=False)
+            response = task.requests.get(retre_url, timeout=60, raise_status=False)
             data = response.content
         except RequestException as e:
             raise plugin.PluginError('Unable to download the data for task %s (%s): %s' %
