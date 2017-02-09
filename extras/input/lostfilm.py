@@ -122,13 +122,17 @@ class LostfilmRSS(object):
             raise plugin.PluginError('Unable to download the data for task %s (%s): %s' %
                                      (task.name, entry['url'], e))
         soup = get_soup(data, 'html.parser')
-        episode_attr = soup.find("div", {"class": "external-btn"})
+
+        copyrightedEpisode = soup.find('div', {'onclick': 'copyrightedEpisode()'})
+        if copyrightedEpisode:
+            log.warning('Copyrighted episode. Unable to download data for task: %s, title: %s (%s)' %
+                        (task.name, entry['title'], entry['url']))
+            return entries
+
+        episode_attr = soup.find('div', {'class': re.compile(r"PlayEpisode\('[\d]*','[\d]*','[\d]*'\)")})
         if episode_attr:
             episode_attr = episode_attr.attrs['onclick']
-        else:
-            log.warning('Unable to download data for task %s (%s)' %
-                        (task.name, entry['url']))
-            return entries
+
         match = re.search("PlayEpisode\('([\d]*)','([\d]*)','([\d]*)'\)", episode_attr)
         show_id = int(match.group(1))
         season_id = int(match.group(2))
@@ -156,14 +160,14 @@ class LostfilmRSS(object):
             info = item.find('div', {'class': 'inner-box--link main'})
             item_url = info.a['href']
             item_text = info.a.string.replace('\n', '').replace('\r', '')
-            re_pattern = re.compile(ur"^(.*).\s([\d]*)\sсезон,\s([\d]*)\sсерия.(.*)$", re.UNICODE)
+            re_pattern = re.compile(ur"^.*.\s[\d]*\sсезон,\s[\d]*\sсерия.(.*)$", re.UNICODE)
             result = re_pattern.search(item_text)
-            entry['series_name'] = result.group(1)
-            entry['series_season'] = result.group(2)
-            entry['series_episode'] = result.group(3)
-            entry['quality'] = result.group(4)
-            entry['url'] = item_url
-            entries.extend(entry)
+            quality = result.group(1)
+            title = re.match('^(.*)\s\((.*)\)\.\s(.*)\.\s\((.*)\)$', entry['title'])
+            item_entry = Entry()
+            item_entry['title'] = '{}.{}.{}.{}'.format(title.group(1), title.group(2), title.group(4), quality)
+            item_entry['url'] = item_url
+            entries.append(item_entry)
         return entries
 
     def _process_invalid_content(self, task, data, url):
@@ -331,7 +335,7 @@ class LostfilmRSS(object):
         # default value is auto but for example guid is used in some feeds
         ignored = 0
         for entry in rss.entries:
-
+            log.verbose(entry[''])
             # Check if title field is overridden in config
             title_field = 'title'
             # ignore entries without title
@@ -395,7 +399,8 @@ class LostfilmRSS(object):
                 continue
 
             for item in self._get_url_from_site(task, config, e):
-                entries.append(item)
+                if len(item) > 0:
+                    entries.extend(item)
 
         # Save last spot in rss
         if rss.entries:
