@@ -1,3 +1,7 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+
 from __future__ import unicode_literals, division, absolute_import
 from builtins import *  # noqa pylint: disable=unused-import, redefined-builtin
 from future.utils import tobytes
@@ -18,7 +22,6 @@ import feedparser
 from requests import RequestException
 
 from flexget import plugin
-from flexget.config_schema import one_or_more
 from flexget.entry import Entry
 from flexget.event import event
 from flexget.utils.cached_input import cached
@@ -42,8 +45,8 @@ class LostfilmRSS(object):
     Configuration for lostfilm rss feed::
 
       lostfilm:
-        rss-url: <url>
-        series-search-url: <url>
+        email: <email>
+        password: <password>
 
     Advanced usages:
 
@@ -53,8 +56,8 @@ class LostfilmRSS(object):
     Example::
 
       lostfilm:
-        rss-url: <url>
-        series-search-url: <url>
+        email: <email>
+        password: <password>
         ascii: yes
 
     You can disable few possibly annoying warnings by setting silent value to
@@ -63,34 +66,54 @@ class LostfilmRSS(object):
     Example::
 
       lostfilm:
-        rss-url: <url>
-        series-search-url: <url>
+        email: <email>
+        password: <password>
         silent: yes
 
     """
 
     schema = {
         'properties': {
-            'rss-url': {'type': 'string', 'format': 'url', 'default': 'https://www.lostfilm.tv/rss.xml'},
-            'series-search-url': {'type': 'string', 'format': 'url', 'default': 'https://lostfilm.tv/v_search.php'},
+            'email': {'type': 'string'},
+            'password': {'type': 'string'},
             'silent': {'type': 'boolean', 'default': False},
             'filename': {'type': 'boolean'},
             'ascii': {'type': 'boolean', 'default': False},
             'all_entries': {'type': 'boolean', 'default': True},
         },
-        'required': ['rss-url', 'series-search-url'],
+        'required': ['email', 'password'],
         'additionalProperties': False
     }
 
-    def build_config(self, config):
+    def _build_config(self, task, config):
         """Set default values to config"""
         config.setdefault('title', 'title')
         # set default for all_entries
         config.setdefault('all_entries', True)
+        config['rss-url'] = 'https://www.lostfilm.tv/rss.xml'
+        config['series-search-url'] = 'https://lostfilm.tv/v_search.php'
+        config['auth-url'] = 'https://www.lostfilm.tv/ajaxik.php'
+        config = self._get_session_token(task, config)
         return config
 
-    def get_url_from_entry(self, task, url, entry):
-        enclosure = []
+    def _get_session_token(self, task, config):
+        try:
+            payload = {'act': 'users', 'type': 'login', 'mail': config['email'], 'pass': config['password'], 'rem': '0'}
+            response = task.requests.get(config['auth-url'], timeout=60, data=payload, raise_status=False)
+            content = response.json()
+        except RequestException as e:
+            raise plugin.PluginError('Unable to get session token for task %s (%s): %s' %
+                                     (task.name, config['auth-url'], e))
+
+        if 'success' in content and 'error' not in content:
+            config['session_token'] = response.cookies['lf_session']
+        else:
+            raise plugin.PluginError('Unable to get session token for task %s (%s): %s' %
+                                     (task.name, config['auth-url'], response.content))
+        return config
+
+    def _get_url_from_site(self, task, config, entry):
+        entries = []
         try:
             # Use the raw response so feedparser can read the headers and status values
             response = task.requests.get(entry['url'], timeout=60, raise_status=False)
@@ -106,7 +129,7 @@ class LostfilmRSS(object):
         episode_id = int(match.group(3))
         try:
             response = task.requests.get('{}?c={}&s={}&e={}'.format(url, show_id, season_id, episode_id),
-                                         timeout=60, raise_status=False)
+                                         timeout=60, cookies={'lf_session': config['session_token']}, raise_status=False)
             data = response.content
         except RequestException as e:
             raise plugin.PluginError('Unable to download the data for task %s (%s): %s' %
@@ -134,10 +157,10 @@ class LostfilmRSS(object):
             entry['series_episode'] = result.group(3)
             entry['quality'] = result.group(4)
             entry['url'] = item_url
-            enclosure.extend(entry)
-        return enclosure
+            entries.extend(entry)
+        return entries
 
-    def process_invalid_content(self, task, data, url):
+    def _process_invalid_content(self, task, data, url):
         """If feedparser reports error, save the received data and log error."""
 
         if data is None:
@@ -167,29 +190,10 @@ class LostfilmRSS(object):
             f.write(data)
         log.critical('I have saved the invalid content to %s for you to view', filepath)
 
-    def add_enclosure_info(self, entry, enclosure, filename=True, multiple=False):
-        """Stores information from an rss enclosure into an Entry."""
-        entry['url'] = enclosure['href']
-        # get optional meta-data
-        if 'length' in enclosure:
-            try:
-                entry['size'] = int(enclosure['length'])
-            except ValueError:
-                entry['size'] = 0
-        if 'type' in enclosure:
-            entry['type'] = enclosure['type']
-        # TODO: better and perhaps join/in download plugin?
-        # Parse filename from enclosure url
-        basename = posixpath.basename(urlsplit(entry['rss-url']).path)
-        # If enclosure has size OR there are multiple enclosures use filename from url
-        if (entry.get('size') or multiple and basename) and filename:
-            entry['filename'] = basename
-            log.trace('filename `%s` from enclosure', entry['filename'])
-
     @cached('lostfilm')
     @plugin.internet(log)
     def on_task_input(self, task, config):
-        config = self.build_config(config)
+        config = self._build_config(config)
 
         log.debug('Requesting task `%s` url `%s`', task.name, config['rss-url'])
 
@@ -285,7 +289,7 @@ class LostfilmRSS(object):
                 elif isinstance(ex, (xml.sax._exceptions.SAXParseException, xml.sax._exceptions.SAXException)):
                     # save invalid data for review, this is a bit ugly but users seem to really confused when
                     # html pages (login pages) are received
-                    self.process_invalid_content(task, content, config['rss-url'])
+                    self._process_invalid_content(task, content, config['rss-url'])
                     if task.options.debug:
                         log.error('bozo error parsing rss: %s' % ex)
                     raise plugin.PluginError('Received invalid RSS content from task %s (%s)' % (task.name,
@@ -294,7 +298,7 @@ class LostfilmRSS(object):
                     raise ex  # let the @internet decorator handle
                 else:
                     # all other bozo errors
-                    self.process_invalid_content(task, content, config['rss-url'])
+                    self._process_invalid_content(task, content, config['rss-url'])
                     raise plugin.PluginError('Unhandled bozo_exception. Type: %s (task: %s)' %
                                              (ex.__class__.__name__, task.name), log)
 
