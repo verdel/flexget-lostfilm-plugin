@@ -8,7 +8,7 @@ from os import path
 here = path.abspath(path.dirname(__file__))
 
 # Parse the version from the mapbox module.
-with open('plex2myshows/__init__.py') as f:
+with open('extras/__init__.py') as f:
     for line in f:
         if line.find("__version__") >= 0:
             version = line.split("=")[1].strip()
