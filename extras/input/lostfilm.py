@@ -88,7 +88,7 @@ class LostfilmRSS(object):
         config.setdefault('all_entries', True)
         return config
 
-    def get_url_from_entry(self, entry):
+    def get_url_from_entry(self, task, entry):
         enclosure = []
         try:
             # Use the raw response so feedparser can read the headers and status values
@@ -187,7 +187,7 @@ class LostfilmRSS(object):
             entry['filename'] = basename
             log.trace('filename `%s` from enclosure', entry['filename'])
 
-    @cached('rss')
+    @cached('lostfilm')
     @plugin.internet(log)
     def on_task_input(self, task, config):
         config = self.build_config(config)
@@ -385,7 +385,7 @@ class LostfilmRSS(object):
                 ignored += 1
                 continue
 
-            for item in self.get_url_from_entry(e):
+            for item in self.get_url_from_entry(task, e):
                 add_entry(item)
 
         # Save last spot in rss
