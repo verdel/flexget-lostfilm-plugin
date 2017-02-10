@@ -317,7 +317,6 @@ class LostfilmRSS(object):
 
         ignored = 0
         for entry in rss.entries:
-            log.verbose(entry[''])
             # Check if title field is overridden in config
             title_field = 'title'
             # ignore entries without title
