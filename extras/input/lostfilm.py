@@ -6,7 +6,7 @@ from __future__ import unicode_literals, division, absolute_import
 from builtins import *  # noqa pylint: disable=unused-import, redefined-builtin
 from future.utils import tobytes
 from past.builtins import basestring
-from future.moves.urllib.parse import urlparse, urlsplit
+from future.moves.urllib.parse import urlparse
 
 import os
 import logging
@@ -25,7 +25,6 @@ from flexget import plugin
 from flexget.entry import Entry
 from flexget.event import event
 from flexget.utils.cached_input import cached
-from flexget.utils.tools import decode_html
 from flexget.utils.pathscrub import pathscrub
 from flexget.utils.soup import get_soup
 
@@ -50,16 +49,6 @@ class LostfilmRSS(object):
 
     Advanced usages:
 
-    You may wish to clean up the entry by stripping out all non-ascii characters.
-    This can be done by setting ascii value to yes.
-
-    Example::
-
-      lostfilm:
-        email: <email>
-        password: <password>
-        ascii: yes
-
     You can disable few possibly annoying warnings by setting silent value to
     yes on feeds where there are frequently invalid items.
 
@@ -78,7 +67,6 @@ class LostfilmRSS(object):
             'password': {'type': 'string'},
             'silent': {'type': 'boolean', 'default': False},
             'filename': {'type': 'boolean'},
-            'ascii': {'type': 'boolean', 'default': False},
             'all_entries': {'type': 'boolean', 'default': True},
         },
         'required': ['email', 'password'],
@@ -86,9 +74,7 @@ class LostfilmRSS(object):
     }
 
     def _build_config(self, task, config):
-        """Set default values to config"""
         config.setdefault('title', 'title')
-        # set default for all_entries
         config.setdefault('all_entries', True)
         config['rss-url'] = 'https://www.lostfilm.tv/rss.xml'
         config['series-search-url'] = 'https://lostfilm.tv/v_search.php'
@@ -113,9 +99,8 @@ class LostfilmRSS(object):
         return config
 
     def _get_url_from_site(self, task, config, entry):
-        entries = []
+        entries = list()
         try:
-            # Use the raw response so feedparser can read the headers and status values
             response = task.requests.get(entry['url'], timeout=60, raise_status=False)
             data = response.content
         except RequestException as e:
@@ -129,7 +114,7 @@ class LostfilmRSS(object):
                         (task.name, entry['title'], entry['url']))
             return entries
 
-        episode_attr = soup.find('div', {'class': re.compile(r"PlayEpisode\('[\d]*','[\d]*','[\d]*'\)")})
+        episode_attr = soup.find('div', {'onclick': re.compile(r"PlayEpisode\('[\d]*','[\d]*','[\d]*'\)")})
         if episode_attr:
             episode_attr = episode_attr.attrs['onclick']
 
@@ -160,13 +145,20 @@ class LostfilmRSS(object):
             info = item.find('div', {'class': 'inner-box--link main'})
             item_url = info.a['href']
             item_text = info.a.string.replace('\n', '').replace('\r', '')
+
             re_pattern = re.compile(ur"^.*.\s[\d]*\sсезон,\s[\d]*\sсерия.(.*)$", re.UNICODE)
             result = re_pattern.search(item_text)
             quality = result.group(1)
+
             title = re.match('^(.*)\s\((.*)\)\.\s(.*)\.\s\((.*)\)$', entry['title'])
+
             item_entry = Entry()
             item_entry['title'] = '{}.{}.{}.{}'.format(title.group(1), title.group(2), title.group(4), quality)
             item_entry['url'] = item_url
+
+            if entry.get('rss_pubdate'):
+                item_entry['rss_pupdate'] = entry['rss_pubdate']
+
             entries.append(item_entry)
         return entries
 
@@ -238,9 +230,6 @@ class LostfilmRSS(object):
             except RequestException as e:
                 raise plugin.PluginError('Unable to download the RSS for task %s (%s): %s' %
                                          (task.name, config['rss-url'], e))
-            if config.get('ascii'):
-                # convert content to ascii (cleanup), can also help with parsing problems on malformed feeds
-                content = response.text.encode('ascii', 'ignore')
 
             # status checks
             status = response.status_code
@@ -324,15 +313,8 @@ class LostfilmRSS(object):
             last_entry_id = task.simple_persistence.get('%s_last_entry' % url_hash)
 
         # new entries to be created
-        entries = []
+        entries = list()
 
-        # Dict with fields to grab mapping from rss field name to FlexGet field name
-        fields = {'guid': 'guid',
-                  'author': 'author',
-                  'description': 'description',
-                  'infohash': 'torrent_info_hash'}
-        # field name for url can be configured by setting link.
-        # default value is auto but for example guid is used in some feeds
         ignored = 0
         for entry in rss.entries:
             log.verbose(entry[''])
@@ -357,50 +339,20 @@ class LostfilmRSS(object):
             # remove annoying zero width spaces
             entry.title = entry.title.replace(u'\u200B', u'')
 
-            # # helper
-            # # TODO: confusing? refactor into class member ...
-
-            # def add_entry(ea):
-            #     ea['title'] = entry['title']
-
-            #     # fields dict may be modified during this loop, so loop over a copy (fields.items())
-            #     for rss_field, flexget_field in list(fields.items()):
-            #         if rss_field in entry:
-            #             if not isinstance(getattr(entry, rss_field), basestring):
-            #                 # Error if this field is not a string
-            #                 log.error('Cannot grab non text field `%s` from rss.', rss_field)
-            #                 # Remove field from list of fields to avoid repeated error
-            #                 del fields[rss_field]
-            #                 continue
-            #             if not getattr(entry, rss_field):
-            #                 log.debug('Not grabbing blank field %s from rss for %s.', rss_field, ea['title'])
-            #                 continue
-            #             try:
-            #                 ea[flexget_field] = decode_html(entry[rss_field])
-            #             except UnicodeDecodeError:
-            #                 log.warning('Failed to decode entry `%s` field `%s`', ea['title'], rss_field)
-            #     # Also grab pubdate if available
-            #     if hasattr(entry, 'published_parsed') and entry.published_parsed:
-            #         ea['rss_pubdate'] = datetime(*entry.published_parsed[:6])
-            #     # store basic auth info
-            #     entries.append(ea)
-
-            # create from enclosures if present
-            # enclosures = entry.get('enclosures', [])
-
             # create flexget entry
-            e = Entry()
-            e['title'] = entry['title']
-            e['url'] = entry['link']
+            entry_info = {}
+            entry_info['title'] = entry['title']
+            entry_info['url'] = entry['link']
+            if hasattr(entry, 'published_parsed') and entry.published_parsed:
+                entry_info['rss_pubdate'] = datetime(*entry.published_parsed[:6])
 
-            if not e.get('url'):
+            if not entry_info.get('url'):
                 log.debug('%s does not have link (%s) or enclosure', entry['title'])
                 ignored += 1
                 continue
 
-            for item in self._get_url_from_site(task, config, e):
-                if len(item) > 0:
-                    entries.extend(item)
+            for item in self._get_url_from_site(task, config, entry_info):
+                    entries.append(item)
 
         # Save last spot in rss
         if rss.entries:
