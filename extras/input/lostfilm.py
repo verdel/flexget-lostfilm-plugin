@@ -11,7 +11,6 @@ from future.moves.urllib.parse import urlparse
 import os
 import logging
 import re
-import requests
 import xml.sax
 import http.client
 from datetime import datetime
@@ -74,7 +73,6 @@ class LostfilmRSS(object):
         config['rss-url'] = 'https://www.lostfilm.tv/rss.xml'
         config['series-search-url'] = 'https://lostfilm.tv/v_search.php'
         config['auth-url'] = 'https://www.lostfilm.tv/ajaxik.php'
-        config = self._get_session_token(task, config)
         return config
 
     def _get_session_token(self, task, config):
@@ -86,12 +84,9 @@ class LostfilmRSS(object):
             raise plugin.PluginError('Unable to get session token for task %s (%s) credentials(): %s' %
                                      (task.name, config['auth-url'], e))
 
-        if 'success' in content and 'error' not in content:
-            config['session_token'] = response.cookies['lf_session']
-        else:
+        if 'success' not in content and 'error' in content:
             raise plugin.PluginError('Unable to get session token for task %s (%s): %s' %
                                      (task.name, config['auth-url'], response.content))
-        return config
 
     def _get_url_from_site(self, task, config, entry):
         entries = list()
@@ -118,8 +113,7 @@ class LostfilmRSS(object):
         season_id = int(match.group(2))
         episode_id = int(match.group(3))
         try:
-            response = requests.get('{}?c={}&s={}&e={}'.format(config['series-search-url'], show_id, season_id, episode_id),
-                                    timeout=60, cookies={'lf_session': config['session_token']})
+            response = task.requests.get('{}?c={}&s={}&e={}'.format(config['series-search-url'], show_id, season_id, episode_id), timeout=60)
             data = response.content
         except RequestException as e:
             raise plugin.PluginError('Unable to download the data for task %s (%s): %s' %
@@ -148,7 +142,7 @@ class LostfilmRSS(object):
             title = re.match('^(.*)\s\((.*)\)\.\s(.*)\.\s\((.*)\)$', entry['title'])
 
             item_entry = Entry()
-            item_entry['title'] = '{}.{}.{}.{}'.format(title.group(1), title.group(2), title.group(4), quality)
+            item_entry['title'] = '{} ({}).{}.{}'.format(title.group(1), title.group(2), title.group(4), quality)
             item_entry['url'] = item_url
 
             if entry.get('rss_pubdate'):
@@ -191,6 +185,7 @@ class LostfilmRSS(object):
     @plugin.internet(log)
     def on_task_input(self, task, config):
         config = self._build_config(task, config)
+        self._get_session_token(task, config)
 
         log.debug('Requesting task `%s` url `%s`', task.name, config['rss-url'])
 
