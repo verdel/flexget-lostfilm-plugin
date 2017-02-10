@@ -32,16 +32,11 @@ log = logging.getLogger('losfilm')
 feedparser.registerDateHandler(lambda date_string: dateutil.parser.parse(date_string).timetuple())
 
 
-def fp_field_name(name):
-    """Translates literal field name to the sanitized one feedparser will use."""
-    return name.replace(':', '_').lower()
-
-
 class LostfilmRSS(object):
     """
     Parses Lostfilm RSS feed and get direct link to torrent files from series page on site.
 
-    Configuration for lostfilm rss feed::
+    Configuration for lostfilm:
 
       lostfilm:
         email: <email>
