@@ -7,7 +7,7 @@ from os import path
 
 here = path.abspath(path.dirname(__file__))
 
-# Parse the version from the mapbox module.
+# Parse the version from the lostfilm module.
 with open('extras/__init__.py') as f:
     for line in f:
         if line.find("__version__") >= 0:
