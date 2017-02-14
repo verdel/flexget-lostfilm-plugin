@@ -15,7 +15,7 @@ Usage
 
 Parses Lostfilm RSS feed and get direct link to torrent files from series page on site.
 
-Configuration for lostfilm:
+#### Configuration for lostfilm:
 
     lostfilm:
         email: <email>
@@ -23,9 +23,10 @@ Configuration for lostfilm:
 
 #### Advanced usages:
 You can disable few possibly annoying warnings by setting silent value to yes on feeds where there are frequently invalid items.
+
 **Example:**
         
-   lostfilm:
+    lostfilm:
         email: <email>
         password: <password>
         silent: yes
