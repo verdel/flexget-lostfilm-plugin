@@ -31,3 +31,9 @@ You can disable few possibly annoying warnings by setting silent value to yes on
         password: <password>
         silent: yes
 
+Output
+------
+
+**Example:**
+
+    По ту сторону (Beyond).S01E08.1080p WEB-DLRip
