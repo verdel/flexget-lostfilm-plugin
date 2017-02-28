@@ -5,5 +5,12 @@ History
 
  (2017-02-10)
 ---------------------
+Version 1.1
 
 * First version.
+
+ (2017-02-28)
+---------------------
+Version 1.2
+
+* Change regexp for full season on retre.org.

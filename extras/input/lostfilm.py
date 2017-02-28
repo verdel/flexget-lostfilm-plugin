@@ -135,7 +135,7 @@ class LostfilmRSS(object):
             item_url = info.a['href']
             item_text = info.a.string.replace('\n', '').replace('\r', '')
 
-            re_pattern = re.compile(ur"^.*.\s[\d]*\sсезон,\s[\d]*\sсерия.(.*)$", re.UNICODE)
+            re_pattern = re.compile(ur"^.*\.(.*)$", re.UNICODE)
             result = re_pattern.search(item_text)
             quality = result.group(1)
 
