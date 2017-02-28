@@ -181,7 +181,7 @@ class LostfilmRSS(object):
             f.write(data)
         log.critical('I have saved the invalid content to %s for you to view', filepath)
 
-    @cached('lostfilm')
+    @cached('lostfilmtv')
     @plugin.internet(log)
     def on_task_input(self, task, config):
         config = self._build_config(task, config)

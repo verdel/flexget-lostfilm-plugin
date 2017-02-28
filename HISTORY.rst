@@ -20,3 +20,9 @@ Version 1.2
 Version 1.3
 
 * Change plugin name.
+
+ (2017-02-28)
+---------------------
+Version 1.4
+
+* Close some issues with plugin name.

@@ -40,6 +40,6 @@ setup(
     license='MIT',
     entry_points="""
         [FlexGet.plugins]
-        lostfilm = extras.input.lostfilmtv""",
+        lostfilmtv = extras.input.lostfilmtv""",
 
 )
