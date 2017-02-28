@@ -27,7 +27,7 @@ from flexget.utils.cached_input import cached
 from flexget.utils.pathscrub import pathscrub
 from flexget.utils.soup import get_soup
 
-log = logging.getLogger('losfilmtv')
+log = logging.getLogger('lostfilmtv')
 feedparser.registerDateHandler(lambda date_string: dateutil.parser.parse(date_string).timetuple())
 
 
@@ -361,4 +361,4 @@ class LostfilmRSS(object):
 
 @event('plugin.register')
 def register_plugin():
-    plugin.register(LostfilmRSS, 'losfilmtv', api_ver=2)
+    plugin.register(LostfilmRSS, 'lostfilmtv', api_ver=2)
