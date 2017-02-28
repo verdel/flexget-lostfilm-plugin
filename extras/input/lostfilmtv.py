@@ -27,7 +27,7 @@ from flexget.utils.cached_input import cached
 from flexget.utils.pathscrub import pathscrub
 from flexget.utils.soup import get_soup
 
-log = logging.getLogger('losfilm')
+log = logging.getLogger('losfilmtv')
 feedparser.registerDateHandler(lambda date_string: dateutil.parser.parse(date_string).timetuple())
 
 
@@ -37,7 +37,7 @@ class LostfilmRSS(object):
 
     Configuration for lostfilm:
 
-      lostfilm:
+      losfilmtv:
         email: <email>
         password: <password>
 
@@ -48,7 +48,7 @@ class LostfilmRSS(object):
 
     Example::
 
-      lostfilm:
+      losfilmtv:
         email: <email>
         password: <password>
         silent: yes
@@ -361,4 +361,4 @@ class LostfilmRSS(object):
 
 @event('plugin.register')
 def register_plugin():
-    plugin.register(LostfilmRSS, 'lostfilm', api_ver=2)
+    plugin.register(LostfilmRSS, 'losfilmtv', api_ver=2)

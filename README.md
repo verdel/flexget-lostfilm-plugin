@@ -17,7 +17,7 @@ Parses Lostfilm RSS feed and get direct link to torrent files from series page o
 
 #### Configuration for lostfilm:
 
-    lostfilm:
+    lostfilmtv:
         email: <email>
         password: <password>
 
@@ -26,7 +26,7 @@ You can disable few possibly annoying warnings by setting silent value to yes on
 
 **Example:**
         
-    lostfilm:
+    lostfilmtv:
         email: <email>
         password: <password>
         silent: yes

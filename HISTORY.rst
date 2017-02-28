@@ -14,3 +14,9 @@ Version 1.1
 Version 1.2
 
 * Change regexp for full season on retre.org.
+
+ (2017-02-28)
+---------------------
+Version 1.3
+
+* Change plugin name.
