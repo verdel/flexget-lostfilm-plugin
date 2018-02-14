@@ -104,14 +104,14 @@ class LostfilmRSS(object):
                         (task.name, entry['title'], entry['url']))
             return entries
 
-        episode_attr = soup.find('div', {'onclick': re.compile(r"PlayEpisode\('[\d]*','[\d]*','[\d]*'\)")})
+        episode_attr = soup.find('div', {'onclick': re.compile(r"PlayEpisode\('([\d]+)([\d]{3})([\d]{3})'\)")})
         if episode_attr:
             episode_attr = episode_attr.attrs['onclick']
         else:
             log.warning('Empty data. Unable to download data for task: %s, title: %s (%s)' %
                         (task.name, entry['title'], entry['url']))
             return entries
-        match = re.search("PlayEpisode\('([\d]*)','([\d]*)','([\d]*)'\)", episode_attr)
+        match = re.search("PlayEpisode\('([\d]+)([\d]{3})([\d]{3})'\)", episode_attr)
         show_id = int(match.group(1))
         season_id = int(match.group(2))
         episode_id = int(match.group(3))
